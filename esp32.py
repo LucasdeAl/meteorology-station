@@ -6,15 +6,16 @@ import random
 import dht
 from machine import Pin, I2C, SoftI2C,ADC
 from time import sleep
-import BME280
+#import BME280
 #from bmp280 import BMP280
 
 # ESP32 - Pin assignment
 i2c = SoftI2C(scl=Pin(22), sda=Pin(21), freq=10000)
 sensor = dht.DHT11(Pin(23))
-pot = ADC(Pin(34)) # sensor detector de chuva
-pot = ADC(Pin(35)) # sensor de humidade solo
-pot.atten(ADC.ATTN_11DB)
+chuva = ADC(Pin(34)) # sensor detector de chuva
+solo = ADC(Pin(35)) # sensor de humidade solo
+chuva.atten(ADC.ATTN_11DB)
+solo.atten(ADC.ATTN_11DB)
 
 def gerar_numero_aleatorio():
     return random.randint(20, 50)
@@ -64,7 +65,7 @@ def provision_device():
         client.connect()
         print("[Provisioning] Conectado ao ThingsBoard.")
         provision_request = ujson.dumps({
-            "deviceName": "nome",
+            "deviceName": "teste",
             "provisionDeviceKey": provision_device_key,
             "provisionDeviceSecret": provision_device_secret
         })
@@ -98,7 +99,7 @@ def publish_telemetry():
     credentials = load_credentials()
     if not credentials:
         print("[Telemetry] Nenhuma credencial encontrada. Execute o provisionamento primeiro.")
-        return
+        return   
 
     print("[Telemetry] Iniciando publicação de telemetria...")
     client = MQTTClient("telemetry_client", THINGSBOARD_HOST, port=THINGSBOARD_PORT, user=credentials, password="")
@@ -106,15 +107,29 @@ def publish_telemetry():
         client.connect()
         print("[Telemetry] Conectado ao ThingsBoard.")
         while True:
-            sensor.measure()
-
-            payload = ujson.dumps({"temperature_dht11": sensor.temperature(), "humidity_dht11": sensor.humidity()})
-            client.publish("v1/devices/me/telemetry", payload)
+            sensor.measure() 
+            
+            chuva_valor = chuva.read()
+           
+            solo_valor = solo.read()
+            payload = ujson.dumps(
+                {
+                         
+                "temperature_dht11": sensor.temperature(),
+                "humidity_dht11": sensor.humidity(),
+                "detector_chuva": chuva_valor,
+                "umidade_solo":  solo_valor
+                }
+            )
+            client.publish("v1/devices/me/attributes", payload)
             print(f"[Telemetry] Publicado: {payload}")
             time.sleep(5)
     except Exception as e:
         print(f"[Telemetry] Erro: {e}")
+        print("Gerando novas credenciais")
         clean_credentials()
+        provision_device()
+        publish_telemetry()
     finally:
         client.disconnect()
 
@@ -126,13 +141,10 @@ def scan_i2c_bus():
         print("Nenhum dispositivo I2C encontrado.")
 
 if __name__ == "__main__":
-    while True:
-        pot_value = pot.read()
-        print(pot_value)
-        sleep(3)
-    #internet_connect()
-    #credentials = load_credentials()
-    #print(credentials)
-    #if not credentials:
-    #    provision_device()  # Executa o provisionamento
-    #publish_telemetry()  # Publica dados de telemetria
+    
+    internet_connect()
+    credentials = load_credentials()
+    print(credentials)
+    if not credentials:
+        provision_device()  # Executa o provisionamento
+    publish_telemetry()  # Publica dados de telemetria

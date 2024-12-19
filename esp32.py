@@ -21,8 +21,8 @@ def gerar_numero_aleatorio():
     return random.randint(20, 50)
 
 # Configurações de provisionamento e MQTT
-provision_device_key = "kdd0uh850p5i3ex5h5o4"
-provision_device_secret = "ox3d0qb9i6hbje3m21c2"
+provision_device_key = "z9bvauzc8vbvozaojjx5"
+provision_device_secret = "nbnnkvb61t70zjp3ib2e"
 THINGSBOARD_HOST = "mqtt.thingsboard.cloud"
 THINGSBOARD_PORT = 1883
 PROVISION_REQUEST_TOPIC = "/provision/request"
@@ -50,6 +50,7 @@ def internet_connect():
     sta_if = network.WLAN(network.STA_IF)
     sta_if.active(True)
     sta_if.connect("Redmi Note 11S", "minhasenha123")
+    #sta_if.connect("LESC", "A33669608F")
     while not sta_if.isconnected():
       print(".", end="")
       time.sleep(0.1)

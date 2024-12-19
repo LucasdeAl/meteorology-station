@@ -6,6 +6,7 @@ import random
 import dht
 from machine import Pin, I2C, SoftI2C,ADC
 from time import sleep
+
 #import BME280
 #from bmp280 import BMP280
 
@@ -17,16 +18,11 @@ solo = ADC(Pin(35)) # sensor de humidade solo
 chuva.atten(ADC.ATTN_11DB)
 solo.atten(ADC.ATTN_11DB)
 
+
+
 def gerar_numero_aleatorio():
     return random.randint(20, 50)
 
-# Configurações de provisionamento e MQTT
-provision_device_key = "z9bvauzc8vbvozaojjx5"
-provision_device_secret = "nbnnkvb61t70zjp3ib2e"
-THINGSBOARD_HOST = "mqtt.thingsboard.cloud"
-THINGSBOARD_PORT = 1883
-PROVISION_REQUEST_TOPIC = "/provision/request"
-PROVISION_RESPONSE_TOPIC = "/provision/response"
 
 # Funções auxiliares para lidar com credenciais
 def save_credentials(credentials):
@@ -44,6 +40,15 @@ def load_credentials():
 def clean_credentials():
     with open("credentials.json", "w") as file:
         file.write("")
+# Configurações de provisionamento e MQTT
+provision_device_key = "z9bvauzc8vbvozaojjx5"
+provision_device_secret = "nbnnkvb61t70zjp3ib2e"
+THINGSBOARD_HOST = "mqtt.thingsboard.cloud"
+THINGSBOARD_PORT = 1883
+PROVISION_REQUEST_TOPIC = "/provision/request"
+PROVISION_RESPONSE_TOPIC = "/provision/response"
+
+ 
         
 def internet_connect():
     print("Conectando-se ao Wi-Fi", end="")
@@ -66,7 +71,7 @@ def provision_device():
         client.connect()
         print("[Provisioning] Conectado ao ThingsBoard.")
         provision_request = ujson.dumps({
-            "deviceName": "teste",
+            "deviceName": "estacao1",
             "provisionDeviceKey": provision_device_key,
             "provisionDeviceSecret": provision_device_secret
         })
@@ -108,21 +113,34 @@ def publish_telemetry():
         client.connect()
         print("[Telemetry] Conectado ao ThingsBoard.")
         while True:
-            sensor.measure() 
-            
-            chuva_valor = chuva.read()
-           
-            solo_valor = solo.read()
+            try:
+                # Tenta medir os dados do sensor
+                sensor.measure()
+                temperatura = sensor.temperature()
+                umidade = sensor.humidity()
+            except Exception as e:
+                # Trata qualquer erro que ocorra durante a leitura
+                print(f"Erro ao medir com o sensor: {e}")
+                temperatura = None
+                umidade = None
+
+            try:
+                chuva_valor = chuva.read() if chuva else None
+                solo_valor = solo.read() if solo else None
+            except Exception as e:
+                print(f"Erro ao ler valores de sensores: {e}")
+                chuva_valor = None
+                solo_valor = None
+
             payload = ujson.dumps(
                 {
-                         
-                "temperature_dht11": sensor.temperature(),
-                "humidity_dht11": sensor.humidity(),
-                "detector_chuva": chuva_valor,
-                "umidade_solo":  solo_valor
+                    "temperature_dht11": temperatura,
+                    "humidity_dht11": umidade,
+                    "detector_chuva": chuva_valor,
+                    "umidade_solo": solo_valor,
                 }
             )
-            client.publish("v1/devices/me/attributes", payload)
+            client.publish("v1/devices/me/telemetry", payload)
             print(f"[Telemetry] Publicado: {payload}")
             time.sleep(5)
     except Exception as e:
@@ -130,7 +148,10 @@ def publish_telemetry():
         print("Gerando novas credenciais")
         clean_credentials()
         provision_device()
+        credentials = load_credentials()
+        print(credentials)
         publish_telemetry()
+        
     finally:
         client.disconnect()
 
